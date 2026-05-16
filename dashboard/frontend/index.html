@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>L1 Operations Dashboard — Banking Mock</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+
+    /* Header */
+    .header { background: #1a1d27; border-bottom: 2px solid #2563eb; padding: 14px 28px;
+      display: flex; align-items: center; justify-content: space-between; }
+    .header h1 { font-size: 18px; font-weight: 600; color: #e2e8f0; letter-spacing: 0.02em; }
+    .header .subtitle { font-size: 12px; color: #64748b; margin-top: 2px; }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    .live-dot { width: 8px; height: 8px; background: #22c55e; border-radius: 50%;
+      animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .live-text { font-size: 12px; color: #22c55e; }
+    .last-poll { font-size: 11px; color: #475569; }
+
+    /* Stats bar */
+    .stats { display: flex; gap: 12px; padding: 14px 28px; background: #13161f;
+      border-bottom: 1px solid #1e2433; }
+    .stat { background: #1a1d27; border: 1px solid #1e2433; border-radius: 8px;
+      padding: 10px 20px; min-width: 130px; }
+    .stat-val { font-size: 24px; font-weight: 700; color: #e2e8f0; }
+    .stat-val.green  { color: #22c55e; }
+    .stat-val.red    { color: #ef4444; }
+    .stat-val.amber  { color: #f59e0b; }
+    .stat-val.blue   { color: #3b82f6; }
+    .stat-label { font-size: 11px; color: #64748b; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+    /* Table container */
+    .table-wrap { padding: 20px 28px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th { background: #1a1d27; color: #94a3b8; font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em; padding: 10px 14px;
+      text-align: left; border-bottom: 1px solid #1e2433; white-space: nowrap; }
+    tbody tr { border-bottom: 1px solid #1a1d27; transition: background 0.15s; cursor: pointer; }
+    tbody tr:hover { background: #1a1d27; }
+    tbody td { padding: 12px 14px; vertical-align: top; }
+    .empty { text-align: center; padding: 60px; color: #475569; font-size: 14px; }
+
+    /* Badges */
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .badge-critical { background: #450a0a; color: #fca5a5; border: 1px solid #7f1d1d; }
+    .badge-warning  { background: #422006; color: #fcd34d; border: 1px solid #78350f; }
+    .badge-resolved { background: #052e16; color: #86efac; border: 1px solid #14532d; }
+    .badge-open     { background: #1e1b4b; color: #a5b4fc; border: 1px solid #312e81; }
+    .badge-high     { background: #1a2744; color: #93c5fd; border: 1px solid #1e3a5f; }
+    .badge-medium   { background: #1c1917; color: #d6d3d1; border: 1px solid #44403c; }
+    .badge-none     { background: #1c1917; color: #78716c; border: 1px solid #292524; }
+
+    /* Resolution panel */
+    .resolution-found { color: #86efac; font-size: 12px; line-height: 1.5; }
+    .resolution-none  { color: #f87171; font-size: 12px; font-style: italic; }
+    .steps { margin-top: 6px; padding-left: 0; list-style: none; }
+    .steps li { font-size: 11px; color: #94a3b8; padding: 2px 0; }
+    .steps li::before { content: "→ "; color: #3b82f6; }
+
+    /* Service name */
+    .service { font-family: 'Courier New', monospace; font-size: 12px;
+      background: #1e2433; padding: 2px 7px; border-radius: 4px; color: #7dd3fc; }
+
+    /* Error text */
+    .error-msg { font-size: 11px; color: #94a3b8; font-family: 'Courier New', monospace;
+      max-width: 280px; word-break: break-word; line-height: 1.4; }
+    .error-exc { font-size: 12px; font-weight: 600; color: #fb923c; margin-bottom: 3px; }
+
+    /* JIRA link */
+    .jira-id { font-size: 12px; font-weight: 600; color: #60a5fa; }
+    .jira-summary { font-size: 11px; color: #64748b; margin-top: 2px; max-width: 200px; }
+
+    /* Action buttons */
+    .actions { display: flex; flex-direction: column; gap: 6px; }
+    .btn { display: inline-block; padding: 5px 12px; border-radius: 5px; font-size: 11px;
+      font-weight: 600; cursor: pointer; border: none; white-space: nowrap; transition: opacity 0.15s; }
+    .btn:hover { opacity: 0.85; }
+    .btn-apply  { background: #15803d; color: #fff; }
+    .btn-create { background: #1d4ed8; color: #fff; }
+    .btn-view   { background: #1e2433; color: #94a3b8; border: 1px solid #334155; }
+
+    /* Detail modal */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100;
+      display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .modal { background: #1a1d27; border: 1px solid #2563eb; border-radius: 12px;
+      width: 100%; max-width: 700px; max-height: 80vh; overflow-y: auto; }
+    .modal-header { padding: 20px 24px; border-bottom: 1px solid #1e2433;
+      display: flex; justify-content: space-between; align-items: center; }
+    .modal-title { font-size: 16px; font-weight: 600; color: #e2e8f0; }
+    .modal-close { background: none; border: none; color: #64748b; font-size: 20px;
+      cursor: pointer; line-height: 1; }
+    .modal-body { padding: 20px 24px; }
+    .detail-section { margin-bottom: 20px; }
+    .detail-label { font-size: 11px; color: #64748b; text-transform: uppercase;
+      letter-spacing: 0.08em; margin-bottom: 6px; }
+    .detail-value { font-size: 13px; color: #e2e8f0; }
+    .detail-code { font-family: 'Courier New', monospace; font-size: 12px;
+      background: #0f1117; padding: 10px; border-radius: 6px; color: #86efac;
+      white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+    .step-list { list-style: none; }
+    .step-list li { padding: 6px 0; border-bottom: 1px solid #1e2433; font-size: 13px; color: #cbd5e1; }
+    .step-list li::before { content: counter(step-counter) ". "; counter-increment: step-counter;
+      color: #3b82f6; font-weight: 600; }
+    .step-list { counter-reset: step-counter; }
+
+    /* Timestamp */
+    .ts { font-size: 11px; color: #475569; white-space: nowrap; }
+
+    /* Alert status badges */
+    .badge-firing   { background: #450a0a; color: #fca5a5; border: 1px solid #ef4444;
+      animation: firing-pulse 1.5s infinite; }
+    .badge-resolved { background: #052e16; color: #86efac; border: 1px solid #22c55e; }
+    .badge-unknown  { background: #1e2433; color: #94a3b8; border: 1px solid #334155; }
+    @keyframes firing-pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>L1 Operations Dashboard</h1>
+    <div class="subtitle">Banking Mock — Agentic AI Incident Monitor</div>
+  </div>
+  <div class="header-right">
+    <div class="live-dot"></div>
+    <span class="live-text">LIVE</span>
+    <span class="last-poll" id="last-poll">Polling...</span>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-val blue" id="stat-total">—</div>
+    <div class="stat-label">Total incidents</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val green" id="stat-resolved">—</div>
+    <div class="stat-label">Resolution found</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val red" id="stat-open">—</div>
+    <div class="stat-label">New incidents</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val amber" id="stat-critical">—</div>
+    <div class="stat-label">Critical alerts</div>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Timestamp</th>
+        <th>Service</th>
+        <th>Alert</th>
+        <th>Error / exception</th>
+        <th>JIRA issue</th>
+        <th>Resolution</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="incident-tbody">
+      <tr><td colspan="8" class="empty">Waiting for first incident...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Detail modal -->
+<div class="modal-backdrop" id="modal" style="display:none" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">Incident detail</span>
+      <button class="modal-close" onclick="document.getElementById('modal').style.display='none'">×</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+  const API = (window.DASHBOARD_API_URL || 'http://' + location.hostname + ':8080');
+  // Firing alerts fetched via dashboard-api proxy — no port 9001 needed
+  let firingAlerts = new Set();
+  let incidents = [];
+
+  function sev(s) {
+    if (!s) return '';
+    const cls = s === 'critical' ? 'badge-critical' : 'badge-warning';
+    return `<span class="badge ${cls}">${s}</span>`;
+  }
+
+  function jiraStatus(s) {
+    const cls = s === 'Done' ? 'badge-resolved' : 'badge-open';
+    return `<span class="badge ${cls}">${s || 'Open'}</span>`;
+  }
+
+  function llmBadge(c) {
+    if (!c) return '';
+    const cls = c === 'high' ? 'badge-resolved' : c === 'medium' ? 'badge-high' : 'badge-none';
+    return `<span class="badge ${cls}">AI:${c}</span>`;
+  }
+
+  function vectorBadge(q) {
+    if (!q) return '';
+    const cls = q === 'high' ? 'badge-high' : q === 'medium' ? 'badge-medium' : 'badge-none';
+    return `<span class="badge ${cls}">vec:${q}</span>`;
+  }
+
+  function shortTs(ts) {
+    if (!ts) return '—';
+    try { return new Date(ts).toLocaleString('en-IN', {timeZone:'Asia/Kolkata', hour12:false}).replace(',',''); }
+    catch { return ts; }
+  }
+
+  function render(data) {
+    incidents = data.incidents || [];
+    const total    = data.total || 0;
+    const resolved = incidents.filter(i => i.resolution_found).length;
+    const open     = incidents.filter(i => !i.resolution_found).length;
+    const critical = incidents.filter(i => i.alert_severity === 'critical').length;
+
+    document.getElementById('stat-total').textContent    = total;
+    document.getElementById('stat-resolved').textContent = resolved;
+    document.getElementById('stat-open').textContent     = open;
+    document.getElementById('stat-critical').textContent = critical;
+
+    if (!incidents.length) {
+      document.getElementById('incident-tbody').innerHTML =
+        '<tr><td colspan="8" class="empty">No incidents yet — agents are polling for alerts...</td></tr>';
+      return;
+    }
+
+    const rows = incidents.map(inc => {
+      const llmPanel = inc.llm_summary
+        ? `<div style="margin-top:6px;padding:6px 8px;background:#0d2137;border-left:3px solid #3b82f6;border-radius:0 4px 4px 0">
+             <div style="font-size:10px;color:#3b82f6;font-weight:600;margin-bottom:3px">
+               AI SUMMARY ${llmBadge(inc.llm_confidence)}</div>
+             <div style="font-size:11px;color:#93c5fd;line-height:1.4">${inc.llm_summary}</div>
+             ${inc.llm_key_action ? `<div style="font-size:11px;color:#fbbf24;margin-top:4px">
+               ⚡ First action: ${inc.llm_key_action}</div>` : ''}
+             ${inc.llm_risk_note && inc.llm_risk_note !== 'None' ? `<div style="font-size:11px;color:#f87171;margin-top:3px">
+               ⚠ ${inc.llm_risk_note}</div>` : ''}
+           </div>` : '';
+
+      const resCell = inc.resolution_found
+        ? `<div class="resolution-found">✓ ${(inc.llm_key_action || inc.error_exception || '').substring(0, 80)}</div>
+           ${inc.jira_issue_id
+             ? `<div style="font-size:11px;color:#64748b;margin-top:4px">→ See JIRA ${inc.jira_issue_id} for full steps</div>` : ''}
+           ${llmPanel}`
+        : `<div class="resolution-none">No similar error recorded</div>${llmPanel}`;
+
+      const actionCell = inc.resolution_found
+        ? `<div class="actions">
+             <button class="btn btn-apply" onclick="showDetail('${inc.incident_id}')">Apply fix ↗</button>
+             <button class="btn btn-view" onclick="showDetail('${inc.incident_id}')">View steps</button>
+           </div>`
+        : `<div class="actions">
+             <button class="btn btn-create" onclick="showDetail('${inc.incident_id}')">Create JIRA ↗</button>
+             <button class="btn btn-view" onclick="showDetail('${inc.incident_id}')">View detail</button>
+           </div>`;
+
+      return `<tr onclick="showDetail('${inc.incident_id}')">
+        <td><span style="font-size:12px;font-weight:600;color:#60a5fa">${inc.incident_id}</span></td>
+        <td><span class="ts">${shortTs(inc.alert_timestamp)}</span></td>
+        <td><span class="service">${inc.service || '—'}</span></td>
+        <td>${sev(inc.alert_severity)}<br><span style="font-size:12px;color:#94a3b8;margin-top:3px;display:block">${inc.alert_name || '—'}</span><br><span style="margin-top:4px;display:block">${statusBadge(inc.alert_name, inc.alert_timestamp)}</span></td>
+        <td>
+          <div class="error-exc">${inc.error_exception || '—'}</div>
+          <div class="error-msg">${(inc.error_message || '').substring(0, 100)}${(inc.error_message||'').length > 100 ? '...' : ''}</div>
+          <div style="margin-top:4px">${vectorBadge(inc.vector_match_quality)}</div>
+        </td>
+        <td>
+          <div class="jira-id">${inc.jira_issue_id || '—'} ${jiraStatus(inc.jira_status)}</div>
+          <div class="jira-summary">${(inc.jira_summary || '').substring(0,60)}${(inc.jira_summary||'').length>60?'...':''}</div>
+        </td>
+        <td>${resCell}</td>
+        <td onclick="event.stopPropagation()">${actionCell}</td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('incident-tbody').innerHTML = rows;
+  }
+
+  function showDetail(id) {
+    const inc = incidents.find(i => i.incident_id === id);
+    if (!inc) return;
+
+    const steps = (inc.resolution_steps || []).map((s, i) =>
+      `<li>${s}</li>`).join('');
+
+    document.getElementById('modal-title').textContent =
+      `Incident ${inc.incident_id} — ${inc.service}`;
+
+    document.getElementById('modal-body').innerHTML = `
+      <div class="detail-section">
+        <div class="detail-label">Alert</div>
+        <div class="detail-value">${inc.alert_name} ${sev(inc.alert_severity)}
+          <span class="ts" style="margin-left:8px">${shortTs(inc.alert_timestamp)}</span>
+        </div>
+        <div style="font-size:12px;color:#64748b;margin-top:4px">${inc.alert_summary || ''}</div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-label">Root cause</div>
+        <div class="error-exc">${inc.error_exception || '—'}</div>
+        <div class="detail-code">${inc.error_message || '—'}</div>
+        <div style="margin-top:6px;font-size:11px;color:#64748b">
+          Recurrence: ${inc.error_recurrence || 0} times in window &nbsp;|&nbsp;
+          Semantic match: ${inc.vector_match_quality || '—'} (score: ${(inc.vector_top_score || 0).toFixed(3)})
+        </div>
+      </div>
+
+      ${inc.llm_summary ? `
+      <div class="detail-section" style="border:1px solid #1e3a5f;border-radius:8px;padding:14px;background:#0d2137">
+        <div class="detail-label" style="color:#3b82f6">AI-generated summary ${llmBadge(inc.llm_confidence)}</div>
+        <div class="detail-value" style="color:#93c5fd;margin-bottom:10px">${inc.llm_summary}</div>
+        ${inc.llm_key_action ? `
+        <div style="margin-bottom:8px">
+          <span style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.06em">First action</span>
+          <div style="font-size:13px;color:#fbbf24;margin-top:4px">⚡ ${inc.llm_key_action}</div>
+        </div>` : ''}
+        ${inc.llm_risk_note && inc.llm_risk_note !== 'None' ? `
+        <div>
+          <span style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.06em">Risk note</span>
+          <div style="font-size:13px;color:#f87171;margin-top:4px">⚠ ${inc.llm_risk_note}</div>
+        </div>` : ''}
+      </div>` : ''}
+
+      ${inc.resolution_found ? `
+      <div class="detail-section">
+        <div class="detail-label">JIRA resolution — ${inc.jira_issue_id}</div>
+        <div class="detail-value" style="margin-bottom:8px;color:#86efac">${inc.llm_key_action || inc.error_exception || ''}</div>
+        ${inc.llm_risk_note ? `<div style="color:#fbbf24;font-size:12px;margin-bottom:8px">⚠ ${inc.llm_risk_note}</div>` : ''}
+        ${steps ? `<div class="detail-label">Resolution steps</div>
+          <ol class="step-list">${steps}</ol>` : ''}
+      </div>` : `
+      <div class="detail-section">
+        <div class="detail-label">JIRA incident created</div>
+        <div class="detail-value">${inc.jira_issue_id || '—'} &nbsp; ${jiraStatus(inc.jira_status)}</div>
+        <div style="margin-top:6px;font-size:13px;color:#f87171">${inc.remark || 'No similar error recorded'}</div>
+        <div style="margin-top:10px;font-size:12px;color:#64748b">L1 action required: Investigate and add resolution to JIRA ${inc.jira_issue_id}</div>
+      </div>`}
+
+      <div class="detail-section">
+        <div class="detail-label">Pipeline metadata</div>
+        <div style="font-size:11px;color:#475569">
+          Pipeline started: ${shortTs(inc.pipeline_start)} &nbsp;|&nbsp;
+          Written: ${shortTs(inc.written_at)}
+          ${inc.pipeline_error ? `<br>Pipeline error: <span style="color:#f87171">${inc.pipeline_error}</span>` : ''}
+        </div>
+      </div>
+    `;
+    document.getElementById('modal').style.display = 'flex';
+  }
+
+  function closeModal(e) {
+    if (e.target.id === 'modal') document.getElementById('modal').style.display = 'none';
+  }
+
+  async function pollFiringAlerts() {
+    try {
+      const resp = await fetch(API + '/firing-alerts');
+      if (!resp.ok) return;
+      const data = await resp.json();
+      firingAlerts = new Set((data.alerts || []).map(a => a.alert_name));
+    } catch(e) {}
+  }
+
+  function alertStatus(alertName) {
+    if (firingAlerts.size === 0) return 'unknown';
+    return firingAlerts.has(alertName) ? 'firing' : 'resolved';
+  }
+
+  function statusBadge(alertName, incidentTs) {
+    const st = alertStatus(alertName);
+    if (st === 'firing') return '<span class="badge badge-firing">🔴 STILL FIRING</span>';
+    if (st === 'resolved') {
+      const ts = incidentTs ? new Date(incidentTs) : null;
+      const ago = ts ? Math.round((Date.now() - ts) / 60000) : null;
+      const when = ago !== null ? ' — occurred ' + ago + 'm ago' : '';
+      return '<span class="badge badge-resolved">&#10003; RESOLVED' + when + '</span>';
+    }
+    return '<span class="badge badge-unknown">— checking status...</span>';
+  }
+
+  async function poll() {
+    try {
+      const resp = await fetch(`${API}/incidents?limit=50`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      render(data);
+      document.getElementById('last-poll').textContent =
+        'Last updated: ' + new Date().toLocaleTimeString('en-IN', {hour12:false});
+    } catch (e) {
+      document.getElementById('last-poll').textContent = 'API error — retrying...';
+      console.error('Poll error:', e);
+    }
+  }
+
+  // Poll immediately then every 10 seconds
+  poll();
+  pollFiringAlerts(); setInterval(function(){ pollFiringAlerts(); poll(); }, 10000);
+</script>
+</body>
+</html>

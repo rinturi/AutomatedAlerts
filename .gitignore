@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+
+# Docker volumes and data
+chroma_data/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Sensitive
+*.pem
+*.key
+
+# Secrets
+.env
+*.env
+**/config.yml
+**/*_key*
+**/*secret*

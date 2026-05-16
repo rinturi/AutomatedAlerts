@@ -1,0 +1,118 @@
+groups:
+  - name: payment-svc-alerts
+    rules:
+      - alert: PaymentDBPoolExhausted
+        expr: payment_db_pool_available < 3
+        for: 30s
+        labels:
+          severity: critical
+          service: payment-svc
+        annotations:
+          summary: "Payment service DB connection pool critically low"
+          description: "Available DB connections dropped to {{ $value }}. Transactions will fail."
+
+      - alert: PaymentHighErrorRate
+        expr: rate(payment_errors_total[2m]) > 0.3
+        for: 30s
+        labels:
+          severity: warning
+          service: payment-svc
+        annotations:
+          summary: "Payment service error rate elevated"
+          description: "Error rate is {{ $value | humanize }} errors/sec over last 2 minutes."
+
+      - alert: PaymentGatewayTimeouts
+        expr: increase(payment_errors_total{error_type="gateway_timeout"}[5m]) > 3
+        for: 1m
+        labels:
+          severity: critical
+          service: payment-svc
+        annotations:
+          summary: "Payment gateway timeouts spiking"
+          description: "{{ $value }} gateway timeouts in last 5 minutes."
+
+  - name: auth-svc-alerts
+    rules:
+      - alert: AuthRedisDown
+        expr: auth_redis_connection_up == 0
+        for: 20s
+        labels:
+          severity: critical
+          service: auth-svc
+        annotations:
+          summary: "Auth service Redis session store is down"
+          description: "Redis connection failed — users cannot log in."
+
+      - alert: AuthBruteForceDetected
+        expr: auth_locked_accounts_total > 5
+        for: 1m
+        labels:
+          severity: critical
+          service: auth-svc
+        annotations:
+          summary: "Multiple accounts locked — possible brute force"
+          description: "{{ $value }} accounts currently locked."
+
+      - alert: AuthHighErrorRate
+        expr: rate(auth_errors_total[2m]) > 0.5
+        for: 30s
+        labels:
+          severity: warning
+          service: auth-svc
+        annotations:
+          summary: "Auth service error rate elevated"
+          description: "Error rate {{ $value | humanize }} errors/sec."
+
+  - name: loan-svc-alerts
+    rules:
+      - alert: LoanCreditBureauDown
+        expr: loan_bureau_timeout_rate > 0.5
+        for: 1m
+        labels:
+          severity: critical
+          service: loan-svc
+        annotations:
+          summary: "Credit bureau API unavailable for loan service"
+          description: "Bureau timeout rate {{ $value | humanizePercentage }}. Loan approvals halted."
+
+      - alert: LoanHighPendingApplications
+        expr: loan_pending_applications > 20
+        for: 2m
+        labels:
+          severity: warning
+          service: loan-svc
+        annotations:
+          summary: "Loan processing backlog growing"
+          description: "{{ $value }} applications pending."
+
+  - name: notification-svc-alerts
+    rules:
+      - alert: NotificationSMSGatewayDown
+        expr: notification_sms_gateway_up == 0
+        for: 20s
+        labels:
+          severity: critical
+          service: notification-svc
+        annotations:
+          summary: "SMS gateway unreachable — notifications failing"
+          description: "Vodafone SMS gateway is down. OTPs and transaction alerts not being delivered."
+
+      - alert: NotificationQueueOverflow
+        expr: notification_queue_depth > 50
+        for: 1m
+        labels:
+          severity: warning
+          service: notification-svc
+        annotations:
+          summary: "Notification queue depth high"
+          description: "Queue depth at {{ $value }} messages."
+
+      - alert: NotificationHighErrorRate
+        expr: rate(notification_errors_total[2m]) > 0.4
+        for: 30s
+        labels:
+          severity: warning
+          service: notification-svc
+        annotations:
+          summary: "Notification service error rate elevated"
+          description: "Error rate {{ $value | humanize }} errors/sec."

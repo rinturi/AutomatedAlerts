@@ -1,0 +1,368 @@
+version: "3.9"
+
+networks:
+  banking-net:
+    driver: bridge
+
+volumes:
+  chroma-data:
+  alert-cache:
+  prometheus-data:
+  grafana-data:
+  lokidata:
+
+services:
+
+  # ─────────────────────────────────────────────
+  # BANKING MICROSERVICES
+  # ─────────────────────────────────────────────
+
+  payment-svc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: payment-svc
+    container_name: payment-svc
+    ports:
+      - "8001:8001"
+    networks:
+      - banking-net
+    environment:
+      - PYTHONUNBUFFERED=1
+    mem_limit: 128m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  auth-svc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: auth-svc
+    container_name: auth-svc
+    ports:
+      - "8002:8002"
+    networks:
+      - banking-net
+    environment:
+      - PYTHONUNBUFFERED=1
+    mem_limit: 128m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  loan-svc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: loan-svc
+    container_name: loan-svc
+    ports:
+      - "8003:8003"
+    networks:
+      - banking-net
+    environment:
+      - PYTHONUNBUFFERED=1
+    mem_limit: 128m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  notification-svc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: notification-svc
+    container_name: notification-svc
+    ports:
+      - "8004:8004"
+    networks:
+      - banking-net
+    environment:
+      - PYTHONUNBUFFERED=1
+    mem_limit: 128m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ─────────────────────────────────────────────
+  # OBSERVABILITY STACK
+  # ─────────────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=3d'
+      - '--web.enable-lifecycle'
+    mem_limit: 256m
+    networks:
+      - banking-net
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    mem_limit: 64m
+    networks:
+      - banking-net
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=bankadmin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_UNIFIED_ALERTING_ENABLED=true
+    mem_limit: 192m
+    networks:
+      - banking-net
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # MCP SERVERS
+  # ─────────────────────────────────────────────
+
+  grafana-mcp:
+    build:
+      context: ./mcp-servers/grafana-mcp
+      dockerfile: Dockerfile
+    container_name: grafana-mcp
+    ports:
+      - "9001:9001"
+    environment:
+      - ALERTMANAGER_URL=http://alertmanager:9093
+      - PROMETHEUS_URL=http://prometheus:9090
+      - MCP_PORT=9001
+    networks:
+      - banking-net
+    mem_limit: 96m
+    depends_on:
+      - alertmanager
+      - prometheus
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  kibana-mcp:
+    build:
+      context: ./mcp-servers/kibana-mcp
+      dockerfile: Dockerfile
+    container_name: kibana-mcp
+    ports:
+      - "9002:9002"
+    environment:
+      - MCP_PORT=9002
+      - LOG_MODE=loki
+      - LOKI_URL=http://loki:3100
+    networks:
+      - banking-net
+    mem_limit: 96m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9002/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  jira-mcp:
+    build:
+      context: ./mcp-servers/jira-mcp
+      dockerfile: Dockerfile
+    container_name: jira-mcp
+    ports:
+      - "9003:9003"
+    environment:
+      - MCP_PORT=9003
+      - JIRA_URL=https://iitr-jiraboard.atlassian.net
+      - JIRA_EMAIL=irrnitw@gmail.com
+      - JIRA_API_TOKEN=ATATT3xFfGF0QNLl0B8EztoahWFa0FNkwsylMJ2D_E_VWUwwPUl978Vn744MDTPFVZtJHND4ygCQvDhzcb7DgW6a_-Unv-zfZxHC_jSIeAAu5FekdotrV1ELB_L6U5GD5bmkfkpyvEOluAkOYtc0dSoU0nF8Q-M5uwf1pGJPF0n4qFIkDawJnLo=FB4D8D6D
+      - JIRA_PROJECT=KAN
+      - JIRA_STORE_PATH=/app/jira_store.json
+      - SIMILARITY_THRESHOLD=0.25
+    networks:
+      - banking-net
+    mem_limit: 96m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9003/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  vectordb-mcp:
+    build:
+      context: ./mcp-servers/vectordb-mcp
+      dockerfile: Dockerfile
+    container_name: vectordb-mcp
+    ports:
+      - "9004:9004"
+    environment:
+      - MCP_PORT=9004
+      - CHROMA_PATH=/app/chroma_data
+      - COLLECTION_NAME=banking_errors
+      - JIRA_STORE_PATH=/app/jira_store.json
+      - EMBED_MODEL=text-embedding-3-small
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - HIGH_THRESHOLD=0.75
+      - MEDIUM_THRESHOLD=0.50
+    volumes:
+      - chroma-data:/app/chroma_data
+    networks:
+      - banking-net
+    mem_limit: 512m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9004/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+
+  dashboard-api:
+    build:
+      context: ./dashboard/api
+      dockerfile: Dockerfile
+    container_name: dashboard-api
+    ports:
+      - "8080:8080"
+    networks:
+      - banking-net
+    mem_limit: 96m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  agents:
+    build:
+      context: ./agents
+      dockerfile: Dockerfile
+    container_name: agents
+    environment:
+      - GRAFANA_MCP_URL=http://grafana-mcp:9001
+      - KIBANA_MCP_URL=http://kibana-mcp:9002
+      - JIRA_MCP_URL=http://jira-mcp:9003
+      - VECTORDB_MCP_URL=http://vectordb-mcp:9004
+      - ALERT_RESOLUTION_MCP_URL=http://alert-resolution-mcp:9005
+      - DASHBOARD_API_URL=http://dashboard-api:8080
+      - POLL_INTERVAL_SECONDS=30
+      - MCP_TIMEOUT=30
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LLM_MODEL=gpt-4o-mini
+      - LLM_ENABLED=true
+    networks:
+      - banking-net
+    mem_limit: 256m
+    depends_on:
+      - grafana-mcp
+      - kibana-mcp
+      - jira-mcp
+      - vectordb-mcp
+      - dashboard-api
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - lokidata:/loki
+    networks:
+      - banking-net
+    mem_limit: 150m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3100/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
+  promtail:
+    image: grafana/promtail:2.9.4
+    container_name: promtail
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./promtail/promtail.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - banking-net
+    mem_limit: 64m
+    depends_on:
+      loki:
+        condition: service_healthy
+    restart: unless-stopped
+
+  alert-resolution-mcp:
+    build:
+      context: ./mcp-servers/alert-resolution-mcp
+      dockerfile: Dockerfile
+    container_name: alert-resolution-mcp
+    ports:
+      - "9005:9005"
+    environment:
+      - MCP_PORT=9005
+      - CHROMA_PATH=/app/alert_cache
+      - COLLECTION_NAME=alert_resolutions
+      - TTL_DAYS=60
+      - CLEANUP_INTERVAL_HOURS=24
+      - EMBED_MODEL=text-embedding-3-small
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - alert-cache:/app/alert_cache
+    networks:
+      - banking-net
+    mem_limit: 128m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9005/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5

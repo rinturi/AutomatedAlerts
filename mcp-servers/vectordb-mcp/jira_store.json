@@ -1,0 +1,685 @@
+{
+  "issues": [
+    {
+      "id": "KAN-4",
+      "summary": "DB connection pool exhausted under peak load",
+      "description": "",
+      "status": "To Do",
+      "priority": "High",
+      "service": "payment-svc",
+      "exception_type": "SQLException",
+      "labels": [
+        "SQLException",
+        "critical",
+        "payment-svc"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "SQLException",
+        "payment-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-5",
+      "summary": "Payment gateway timeout \u2014 network routing issue",
+      "description": "",
+      "status": "To Do",
+      "priority": "High",
+      "service": "payment-svc",
+      "exception_type": "PaymentGatewayException",
+      "labels": [
+        "PaymentGatewayException",
+        "critical",
+        "payment-svc"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "PaymentGatewayException",
+        "payment-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-6",
+      "summary": "Duplicate transaction detection \u2014 idempotency key collision",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "payment-svc",
+      "exception_type": "DuplicateTransactionException",
+      "labels": [
+        "DuplicateTransactionException",
+        "payment-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "DuplicateTransactionException",
+        "payment-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-7",
+      "summary": "Insufficient funds error spike \u2014 balance service latency",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "payment-svc",
+      "exception_type": "InsufficientFundsException",
+      "labels": [
+        "InsufficientFundsException",
+        "payment-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "InsufficientFundsException",
+        "payment-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-8",
+      "summary": "Card expired errors \u2014 card validity check missing",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "payment-svc",
+      "exception_type": "CardExpiredException",
+      "labels": [
+        "CardExpiredException",
+        "payment-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "CardExpiredException",
+        "payment-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-9",
+      "summary": "Payment high error rate \u2014 multiple error types combined",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "payment-svc",
+      "exception_type": "PaymentHighErrorRate",
+      "labels": [
+        "PaymentHighErrorRate",
+        "payment-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "PaymentHighErrorRate",
+        "payment-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-10",
+      "summary": "Payment processor thread pool saturation",
+      "description": "",
+      "status": "To Do",
+      "priority": "High",
+      "service": "payment-svc",
+      "exception_type": "ThreadPoolException",
+      "labels": [
+        "ThreadPoolException",
+        "critical",
+        "payment-svc"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "ThreadPoolException",
+        "payment-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-11",
+      "summary": "Merchant ID validation failure \u2014 invalid merchant registry",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "payment-svc",
+      "exception_type": "MerchantValidationException",
+      "labels": [
+        "MerchantValidationException",
+        "payment-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "MerchantValidationException",
+        "payment-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-12",
+      "summary": "Redis session store ECONNREFUSED \u2014 replica pod crashed",
+      "description": "",
+      "status": "To Do",
+      "priority": "High",
+      "service": "auth-svc",
+      "exception_type": "RedisConnectionException",
+      "labels": [
+        "RedisConnectionException",
+        "auth-svc",
+        "critical"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "RedisConnectionException",
+        "auth-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-13",
+      "summary": "Brute force attack \u2014 multiple accounts locked",
+      "description": "",
+      "status": "To Do",
+      "priority": "High",
+      "service": "auth-svc",
+      "exception_type": "BruteForceException",
+      "labels": [
+        "BruteForceException",
+        "auth-svc",
+        "critical"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "BruteForceException",
+        "auth-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-14",
+      "summary": "LDAP directory timeout \u2014 AD server unreachable",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "auth-svc",
+      "exception_type": "LDAPTimeoutException",
+      "labels": [
+        "LDAPTimeoutException",
+        "auth-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "LDAPTimeoutException",
+        "auth-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-15",
+      "summary": "JWT signature verification failure \u2014 key rotation issue",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "auth-svc",
+      "exception_type": "JWTSignatureException",
+      "labels": [
+        "JWTSignatureException",
+        "auth-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "JWTSignatureException",
+        "auth-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-16",
+      "summary": "Token race condition \u2014 concurrent refresh requests",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "auth-svc",
+      "exception_type": "TokenRaceConditionException",
+      "labels": [
+        "TokenRaceConditionException",
+        "auth-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "TokenRaceConditionException",
+        "auth-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-17",
+      "summary": "Auth service high error rate \u2014 LDAP and JWT combined",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "auth-svc",
+      "exception_type": "AuthHighErrorRate",
+      "labels": [
+        "AuthHighErrorRate",
+        "auth-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "AuthHighErrorRate",
+        "auth-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-18",
+      "summary": "Session store connection pool exhausted",
+      "description": "",
+      "status": "To Do",
+      "priority": "High",
+      "service": "auth-svc",
+      "exception_type": "RedisPoolException",
+      "labels": [
+        "RedisPoolException",
+        "auth-svc",
+        "critical"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "RedisPoolException",
+        "auth-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-19",
+      "summary": "OAuth token expiry not handled \u2014 silent failures",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "auth-svc",
+      "exception_type": "OAuthTokenException",
+      "labels": [
+        "OAuthTokenException",
+        "auth-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "OAuthTokenException",
+        "auth-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-20",
+      "summary": "CIBIL credit bureau API timeout \u2014 rate limit exceeded",
+      "description": "",
+      "status": "To Do",
+      "priority": "High",
+      "service": "loan-svc",
+      "exception_type": "CreditBureauTimeoutException",
+      "labels": [
+        "CreditBureauTimeoutException",
+        "critical",
+        "loan-svc"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "CreditBureauTimeoutException",
+        "loan-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-21",
+      "summary": "Risk engine unavailable \u2014 memory overflow",
+      "description": "",
+      "status": "To Do",
+      "priority": "High",
+      "service": "loan-svc",
+      "exception_type": "RiskEngineException",
+      "labels": [
+        "RiskEngineException",
+        "critical",
+        "loan-svc"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "RiskEngineException",
+        "loan-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-22",
+      "summary": "EMI calculation arithmetic overflow \u2014 large loan amounts",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "loan-svc",
+      "exception_type": "ArithmeticException",
+      "labels": [
+        "ArithmeticException",
+        "loan-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "ArithmeticException",
+        "loan-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-23",
+      "summary": "KYC verification name mismatch \u2014 OCR accuracy issue",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "loan-svc",
+      "exception_type": "KYCVerificationException",
+      "labels": [
+        "KYCVerificationException",
+        "loan-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "KYCVerificationException",
+        "loan-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-24",
+      "summary": "Document OCR parse failure \u2014 PDF corruption",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "loan-svc",
+      "exception_type": "DocumentParseException",
+      "labels": [
+        "DocumentParseException",
+        "loan-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "DocumentParseException",
+        "loan-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-25",
+      "summary": "Loan processing backlog \u2014 credit bureau cascade delay",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "loan-svc",
+      "exception_type": "LoanBacklogException",
+      "labels": [
+        "LoanBacklogException",
+        "loan-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "LoanBacklogException",
+        "loan-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-26",
+      "summary": "Loan disbursement failure \u2014 bank account validation error",
+      "description": "",
+      "status": "To Do",
+      "priority": "High",
+      "service": "loan-svc",
+      "exception_type": "DisbursementException",
+      "labels": [
+        "DisbursementException",
+        "critical",
+        "loan-svc"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "DisbursementException",
+        "loan-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-27",
+      "summary": "Credit score cache stale \u2014 incorrect loan eligibility",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "loan-svc",
+      "exception_type": "CreditScoreCacheException",
+      "labels": [
+        "CreditScoreCacheException",
+        "loan-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "CreditScoreCacheException",
+        "loan-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-28",
+      "summary": "SMS gateway unreachable \u2014 Vodafone API down",
+      "description": "",
+      "status": "To Do",
+      "priority": "High",
+      "service": "notification-svc",
+      "exception_type": "SMSGatewayException",
+      "labels": [
+        "SMSGatewayException",
+        "critical",
+        "notification-svc"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "SMSGatewayException",
+        "notification-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-29",
+      "summary": "SMTP TLS certificate expired \u2014 email notifications failing",
+      "description": "",
+      "status": "To Do",
+      "priority": "High",
+      "service": "notification-svc",
+      "exception_type": "SMTPConnectionException",
+      "labels": [
+        "SMTPConnectionException",
+        "critical",
+        "notification-svc"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "SMTPConnectionException",
+        "notification-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-30",
+      "summary": "Kafka notification queue overflow \u2014 consumer group lag",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "notification-svc",
+      "exception_type": "QueueOverflowException",
+      "labels": [
+        "QueueOverflowException",
+        "notification-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "QueueOverflowException",
+        "notification-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-31",
+      "summary": "Jinja2 template render failure \u2014 missing variable",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "notification-svc",
+      "exception_type": "TemplateRenderException",
+      "labels": [
+        "TemplateRenderException",
+        "notification-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "TemplateRenderException",
+        "notification-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-32",
+      "summary": "FCM push token expired \u2014 silent push notification failure",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "notification-svc",
+      "exception_type": "FCMTokenException",
+      "labels": [
+        "FCMTokenException",
+        "notification-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "FCMTokenException",
+        "notification-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-33",
+      "summary": "Notification high error rate \u2014 SMS and email combined failure",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "notification-svc",
+      "exception_type": "NotificationHighErrorRate",
+      "labels": [
+        "NotificationHighErrorRate",
+        "notification-svc",
+        "warning"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "NotificationHighErrorRate",
+        "notification-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    },
+    {
+      "id": "KAN-40",
+      "summary": "Test issue from banking-mock agent",
+      "description": "",
+      "status": "To Do",
+      "priority": "Medium",
+      "service": "payment-svc",
+      "exception_type": "TestException",
+      "labels": [
+        "TestException",
+        "payment-svc"
+      ],
+      "resolution": "",
+      "resolution_steps": [],
+      "error_keywords": [
+        "TestException",
+        "payment-svc"
+      ],
+      "fixed_in_version": "1.0.0",
+      "source": "jira_cloud"
+    }
+  ]
+}
