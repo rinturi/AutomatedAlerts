@@ -1,0 +1,247 @@
+# =============================================================================
+# AutomatedAlerts Platform — Full Configuration Reference
+# Copy this file to config.yml and fill in your values.
+# =============================================================================
+
+organisation:
+  name: "Your Organisation Name"
+  environment: "production"     # production | staging | dev
+  timezone: "UTC"               # IANA timezone e.g. Asia/Kolkata, US/Eastern
+
+# ── Alert Source ──────────────────────────────────────────────────────────────
+# Pick ONE connector. Comment out the others.
+
+# Option A: Grafana Alertmanager (default)
+alerts:
+  connector: grafana_alertmanager
+  config:
+    url: "http://alertmanager:9093"
+    auth: none
+
+# Option B: PagerDuty
+# alerts:
+#   connector: pagerduty
+#   config:
+#     api_key: "${PAGERDUTY_API_KEY}"
+#     service_ids: ["P1ABC23", "P4DEF56"]
+
+# Option C: Datadog
+# alerts:
+#   connector: datadog
+#   config:
+#     api_key: "${DATADOG_API_KEY}"
+#     app_key: "${DATADOG_APP_KEY}"
+#     site: "datadoghq.com"
+
+# Option D: OpsGenie
+# alerts:
+#   connector: opsgenie
+#   config:
+#     api_key: "${OPSGENIE_API_KEY}"
+#     team: "platform-oncall"
+
+# Option E: Custom webhook
+# alerts:
+#   connector: custom_webhook
+#   config:
+#     url: "http://your-system/alerts"
+#     auth_header: "Bearer ${WEBHOOK_TOKEN}"
+#     alert_name_path: "$.alerts[0].labels.alertname"
+#     service_path: "$.alerts[0].labels.service"
+
+# ── Log Source ────────────────────────────────────────────────────────────────
+
+# Option A: Grafana Loki (default)
+logs:
+  connector: loki
+  config:
+    url: "http://loki:3100"
+    auth: none
+
+# Option B: Splunk
+# logs:
+#   connector: splunk
+#   config:
+#     url: "https://splunk.company.com:8089"
+#     token: "${SPLUNK_TOKEN}"
+#     index: "banking_prod"
+
+# Option C: Elasticsearch / Kibana / OpenSearch
+# logs:
+#   connector: elasticsearch
+#   config:
+#     url: "https://elastic.company.com:9200"
+#     username: "elastic"
+#     password: "${ELASTIC_PASSWORD}"
+#     index_pattern: "banking-*"
+
+# Option D: AWS CloudWatch Logs
+# logs:
+#   connector: cloudwatch
+#   config:
+#     region: "ap-south-1"
+#     aws_access_key: "${AWS_ACCESS_KEY_ID}"
+#     aws_secret_key: "${AWS_SECRET_ACCESS_KEY}"
+#     log_group: "/banking/production"
+
+# Option E: Datadog Logs
+# logs:
+#   connector: datadog_logs
+#   config:
+#     api_key: "${DATADOG_API_KEY}"
+#     app_key: "${DATADOG_APP_KEY}"
+#     default_query: "service:payment-svc status:error"
+
+# ── Issue Tracker ─────────────────────────────────────────────────────────────
+
+# Option A: Jira Cloud (default)
+issues:
+  connector: jira_cloud
+  config:
+    url: "https://yourorg.atlassian.net"
+    project_key: "BANK"
+    email: "${JIRA_EMAIL}"
+    api_token: "${JIRA_API_TOKEN}"
+
+# Option B: ServiceNow
+# issues:
+#   connector: servicenow
+#   config:
+#     url: "https://yourorg.service-now.com"
+#     username: "${SNOW_USERNAME}"
+#     password: "${SNOW_PASSWORD}"
+#     table: "incident"
+
+# Option C: Linear
+# issues:
+#   connector: linear
+#   config:
+#     api_key: "${LINEAR_API_KEY}"
+#     team_id: "PLATFORM"
+
+# Option D: GitHub Issues
+# issues:
+#   connector: github_issues
+#   config:
+#     token: "${GITHUB_TOKEN}"
+#     owner: "yourorg"
+#     repo: "banking-platform"
+
+# Option E: Azure DevOps
+# issues:
+#   connector: azure_devops
+#   config:
+#     org_url: "https://dev.azure.com/yourorg"
+#     pat: "${AZURE_DEVOPS_PAT}"
+#     project: "BankingPlatform"
+
+# ── LLM Provider ─────────────────────────────────────────────────────────────
+
+# Option A: OpenAI (default, best quality)
+llm:
+  provider: openai
+  model: gpt-4o-mini
+  config:
+    api_key: "${OPENAI_API_KEY}"
+    max_tokens: 1000
+    temperature: 0.1
+
+# Option B: Anthropic Claude
+# llm:
+#   provider: anthropic
+#   model: claude-haiku-4-5
+#   config:
+#     api_key: "${ANTHROPIC_API_KEY}"
+#     max_tokens: 1000
+
+# Option C: Azure OpenAI (data stays in your Azure tenant)
+# llm:
+#   provider: azure_openai
+#   model: gpt-4o-mini
+#   config:
+#     endpoint: "https://your-resource.openai.azure.com/"
+#     api_key: "${AZURE_OPENAI_API_KEY}"
+#     deployment: "gpt-4o-mini"
+#     api_version: "2024-02-01"
+
+# Option D: AWS Bedrock (data stays in your AWS account)
+# llm:
+#   provider: bedrock
+#   model: "anthropic.claude-3-haiku-20240307-v1:0"
+#   config:
+#     region: "ap-south-1"
+#     aws_access_key: "${AWS_ACCESS_KEY_ID}"
+#     aws_secret_key: "${AWS_SECRET_ACCESS_KEY}"
+
+# Option E: Ollama (fully local, free, on-premise)
+# llm:
+#   provider: ollama
+#   model: llama3.1:8b
+#   config:
+#     url: "http://ollama:11434"
+#     # No API key needed
+
+# ── Embedding Model ───────────────────────────────────────────────────────────
+
+# Option A: OpenAI (default, best quality)
+embeddings:
+  provider: openai
+  model: text-embedding-3-small
+  dimensions: 1536
+  config:
+    api_key: "${OPENAI_API_KEY}"
+
+# Option B: Cohere
+# embeddings:
+#   provider: cohere
+#   model: embed-english-v3.0
+#   dimensions: 1024
+#   config:
+#     api_key: "${COHERE_API_KEY}"
+
+# Option C: Ollama nomic-embed-text (local, free)
+# embeddings:
+#   provider: ollama
+#   model: nomic-embed-text
+#   dimensions: 768
+#   config:
+#     url: "http://ollama:11434"
+
+# Option D: HuggingFace all-MiniLM-L6-v2 (local, free, minimal quality)
+# embeddings:
+#   provider: huggingface
+#   model: sentence-transformers/all-MiniLM-L6-v2
+#   dimensions: 384
+#   config:
+#     device: cpu     # cpu | cuda
+
+# ── Vector Store ──────────────────────────────────────────────────────────────
+
+# Option A: ChromaDB local (default, free)
+vectordb:
+  provider: chromadb
+  config:
+    path: /app/chroma_data
+
+# Option B: Qdrant
+# vectordb:
+#   provider: qdrant
+#   config:
+#     url: "http://qdrant:6333"
+#     api_key: "${QDRANT_API_KEY}"     # optional for local
+
+# Option C: Pinecone (managed, enterprise)
+# vectordb:
+#   provider: pinecone
+#   config:
+#     api_key: "${PINECONE_API_KEY}"
+#     environment: "us-east1-gcp"
+#     index_name: "banking-issues"
+
+# ── Pipeline Settings ─────────────────────────────────────────────────────────
+pipeline:
+  poll_interval_seconds: 30
+  cache_ttl_days: 60
+  cache_cleanup_interval_hours: 24
+  similarity_threshold_high: 0.75
+  similarity_threshold_medium: 0.50
