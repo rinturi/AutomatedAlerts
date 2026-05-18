@@ -1,65 +1,51 @@
 """
 llm_client.py — LLM integration for Agent 2 (JIRA Resolver).
 
-Uses OpenAI GPT-4o-mini to:
-  1. Summarise how a matched JIRA resolution applies to the current incident
-  2. Generate a contextualised explanation for the L1 engineer
-  3. Assess confidence that the resolution actually fits
+Now routes through ai_provider.py which supports:
+    OpenAI, Anthropic, Azure OpenAI, AWS Bedrock, Ollama
+All configured via config.yml llm block.
 
-Called by agent_jira_resolver.py after fetching a resolution from jira-mcp.
+Public interface unchanged — agents call the same functions.
 """
 
 import json
 import logging
-import os
 from typing import Optional
-
-import httpx
 
 logger = logging.getLogger("llm_client")
 
-OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-LLM_MODEL      = os.getenv("LLM_MODEL", "gpt-4o-mini")
-LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "1024"))
-LLM_ENABLED    = os.getenv("LLM_ENABLED", "true").lower() == "true"
-
-
-def _call_openai(prompt: str, max_tokens: int = None) -> Optional[str]:
-    """Generic OpenAI chat completion call. Returns response text or None."""
-    if not OPENAI_API_KEY:
-        logger.warning("OPENAI_API_KEY not set — skipping LLM call")
-        return None
-
-    try:
-        resp = httpx.post(
-            OPENAI_API_URL,
-            headers={
-                "Authorization": f"Bearer {OPENAI_API_KEY}",
-                "Content-Type":  "application/json",
-            },
-            json={
-                "model":      LLM_MODEL,
-                "max_tokens": max_tokens or LLM_MAX_TOKENS,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ]
-            },
-            timeout=30.0
+# Import provider — falls back gracefully if config not found
+try:
+    from ai_provider import call_llm, get_provider_info
+    _info = get_provider_info()
+    logger.info(
+        f"LLM ready — provider={_info['provider']}  "
+        f"model={_info['model']}  enabled={_info['enabled']}"
+    )
+except Exception as e:
+    logger.warning(f"ai_provider load warning: {e} — will use env var fallback")
+    def call_llm(prompt, max_tokens=None):
+        import os, urllib.request
+        api_key = os.getenv("OPENAI_API_KEY", "")
+        model   = os.getenv("LLM_MODEL", "gpt-4o-mini")
+        if not api_key:
+            return None
+        payload = json.dumps({
+            "model": model, "max_tokens": max_tokens or 1024,
+            "messages": [{"role": "user", "content": prompt}]
+        }).encode()
+        req = urllib.request.Request(
+            "https://api.openai.com/v1/chat/completions",
+            data=payload,
+            headers={"Authorization": f"Bearer {api_key}",
+                     "Content-Type": "application/json"},
+            method="POST"
         )
-        resp.raise_for_status()
-        data = resp.json()
-        return data["choices"][0]["message"]["content"].strip()
-
-    except httpx.HTTPStatusError as e:
-        logger.error(
-            f"OpenAI API HTTP error {e.response.status_code}: "
-            f"{e.response.text[:200]}"
-        )
-        return None
-    except Exception as e:
-        logger.error(f"OpenAI API call failed: {e}")
-        return None
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return json.loads(r.read())["choices"][0]["message"]["content"].strip()
+        except Exception:
+            return None
 
 
 def summarise_resolution(
@@ -75,25 +61,19 @@ def summarise_resolution(
     vector_score:     float,
 ) -> Optional[dict]:
     """
-    Call GPT-4o-mini to produce a contextualised resolution summary.
+    Produce a contextualised resolution summary for the L1 engineer.
+    Routes to configured LLM provider via ai_provider.call_llm().
 
-    Returns a dict with:
-      llm_summary        — 2-3 sentence explanation for the L1 engineer
-      llm_confidence     — high / medium / low
-      llm_key_action     — single most important step to take first
-      llm_risk_note      — any risk or caveat before applying the fix
+    Returns dict with: llm_summary, llm_confidence, llm_key_action, llm_risk_note
+    Returns None on any failure — pipeline continues without LLM output.
     """
-    if not LLM_ENABLED:
-        logger.info("LLM disabled — skipping summarisation")
-        return None
-
     steps_text = "\n".join(
         f"  {i+1}. {s}" for i, s in enumerate(resolution_steps)
     ) if resolution_steps else "  No steps available"
 
     prompt = f"""You are an expert L1 banking operations engineer assistant.
 
-A monitoring alert has fired and a similar past JIRA resolution has been found.
+A monitoring alert has fired and a similar past issue resolution has been found.
 Analyse whether the past resolution applies to the current incident and provide
 a clear, actionable summary for the L1 engineer on duty.
 
@@ -104,7 +84,7 @@ a clear, actionable summary for the L1 engineer on duty.
 - Exception:   {error_exception or 'Unknown'}
 - Error:       {error_message}
 
-## Matched Past Resolution (JIRA {jira_issue_id})
+## Matched Past Resolution ({jira_issue_id})
 - Issue:       {jira_summary}
 - Similarity:  {vector_score:.2f} (semantic match score out of 1.0)
 - Resolution:  {resolution}
@@ -120,15 +100,14 @@ Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
   "llm_risk_note": "Any risk, caveat, or thing to verify before applying the fix. Write None if no risks."
 }}"""
 
-    raw = _call_openai(prompt)
+    raw = call_llm(prompt)
     if not raw:
         return None
 
     try:
-        # Strip markdown code fences if model added them
         cleaned = raw
         if cleaned.startswith("```"):
-            parts = cleaned.split("```")
+            parts   = cleaned.split("```")
             cleaned = parts[1] if len(parts) > 1 else cleaned
             if cleaned.startswith("json"):
                 cleaned = cleaned[4:]
@@ -136,8 +115,8 @@ Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
 
         result = json.loads(cleaned)
         logger.info(
-            f"LLM summary generated — confidence={result.get('llm_confidence')}, "
-            f"model={LLM_MODEL}"
+            f"LLM summary generated — "
+            f"confidence={result.get('llm_confidence')}"
         )
         return result
 
@@ -154,16 +133,13 @@ def generate_new_incident_description(
     error_exception: str,
 ) -> Optional[str]:
     """
-    When no JIRA match is found, use GPT-4o-mini to generate a well-structured
-    incident description for the new JIRA ticket Agent 2 creates.
+    Generate a structured incident description for a new issue ticket.
+    Called by Agent 2 when no matching issue is found.
     """
-    if not LLM_ENABLED or not OPENAI_API_KEY:
-        return None
-
-    prompt = f"""You are a banking operations engineer creating a JIRA incident ticket.
+    prompt = f"""You are a banking operations engineer creating an incident ticket.
 
 Write a clear, structured incident description for the following error.
-Keep it under 200 words. Include: what happened, likely impact on customers,
+Keep it under 200 words. Include: what happened, likely customer impact,
 and suggested investigation steps for the on-call engineer.
 
 Service:    {service}
@@ -174,7 +150,7 @@ Error:      {error_message}
 
 Write only the description text. No headings, no JSON, no markdown."""
 
-    result = _call_openai(prompt, max_tokens=512)
+    result = call_llm(prompt, max_tokens=512)
     if result:
-        logger.info("LLM generated incident description for new JIRA ticket")
+        logger.info("LLM generated incident description for new issue ticket")
     return result
