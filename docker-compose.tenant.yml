@@ -1,0 +1,251 @@
+# =============================================================================
+# AutomatedAlerts — Tenant-aware deployment
+#
+# Usage:
+#   TENANT=iitr-banking docker compose -f docker-compose.tenant.yml up -d
+#   TENANT=acme-corp    docker compose -f docker-compose.tenant.yml up -d
+#
+# The TENANT env var selects which tenants/{name}/config.yml to use.
+# All platform core containers are identical across tenants.
+# Only the config.yml mounted into each container differs.
+# =============================================================================
+
+x-mcp-base: &mcp-base
+  restart: unless-stopped
+  networks:
+    - banking-net
+  volumes:
+    - ./tenants/${TENANT:-iitr-banking}/config.yml:/app/config.yml:ro
+
+services:
+
+  # ── Microservices ───────────────────────────────────────────────────────────
+  payment-svc:
+    build:
+      context: .
+      dockerfile: payment-svc/Dockerfile
+    container_name: payment-svc
+    ports: ["8001:8001"]
+    networks: [banking-net]
+    mem_limit: 128m
+    restart: unless-stopped
+
+  auth-svc:
+    build:
+      context: .
+      dockerfile: auth-svc/Dockerfile
+    container_name: auth-svc
+    ports: ["8002:8002"]
+    networks: [banking-net]
+    mem_limit: 128m
+    restart: unless-stopped
+
+  loan-svc:
+    build:
+      context: .
+      dockerfile: loan-svc/Dockerfile
+    container_name: loan-svc
+    ports: ["8003:8003"]
+    networks: [banking-net]
+    mem_limit: 128m
+    restart: unless-stopped
+
+  notification-svc:
+    build:
+      context: .
+      dockerfile: notification-svc/Dockerfile
+    container_name: notification-svc
+    ports: ["8004:8004"]
+    networks: [banking-net]
+    mem_limit: 128m
+    restart: unless-stopped
+
+  # ── Observability ───────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: prometheus
+    ports: ["9090:9090"]
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus-data:/prometheus
+    networks: [banking-net]
+    mem_limit: 256m
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: alertmanager
+    ports: ["9093:9093"]
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    networks: [banking-net]
+    mem_limit: 64m
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: grafana
+    ports: ["3000:3000"]
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=bankadmin123
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks: [banking-net]
+    mem_limit: 192m
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: loki
+    ports: ["3100:3100"]
+    volumes:
+      - lokidata:/loki
+    networks: [banking-net]
+    mem_limit: 150m
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:2.9.4
+    container_name: promtail
+    volumes:
+      - ./promtail/promtail.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [banking-net]
+    mem_limit: 64m
+    restart: unless-stopped
+
+  # ── MCP Servers (generic — connector from config.yml) ──────────────────────
+  alert-mcp:
+    <<: *mcp-base
+    build:
+      context: .
+      dockerfile: mcp-servers/alert-mcp/Dockerfile
+    container_name: alert-mcp
+    ports: ["9001:9001"]
+    environment:
+      - MCP_PORT=9001
+      - CONFIG_PATH=/app/config.yml
+    mem_limit: 96m
+
+  logs-mcp:
+    <<: *mcp-base
+    build:
+      context: .
+      dockerfile: mcp-servers/logs-mcp/Dockerfile
+    container_name: logs-mcp
+    ports: ["9002:9002"]
+    environment:
+      - MCP_PORT=9002
+      - CONFIG_PATH=/app/config.yml
+    mem_limit: 96m
+
+  issues-mcp:
+    <<: *mcp-base
+    build:
+      context: .
+      dockerfile: mcp-servers/issues-mcp/Dockerfile
+    container_name: issues-mcp
+    ports: ["9003:9003"]
+    environment:
+      - MCP_PORT=9003
+      - CONFIG_PATH=/app/config.yml
+      - JIRA_EMAIL=${JIRA_EMAIL}
+      - JIRA_API_TOKEN=${JIRA_API_TOKEN}
+      - PAGERDUTY_API_KEY=${PAGERDUTY_API_KEY:-}
+      - SNOW_USERNAME=${SNOW_USERNAME:-}
+      - SNOW_PASSWORD=${SNOW_PASSWORD:-}
+    mem_limit: 96m
+
+  vectordb-mcp:
+    <<: *mcp-base
+    build:
+      context: .
+      dockerfile: mcp-servers/vectordb-mcp/Dockerfile
+    container_name: vectordb-mcp
+    ports: ["9004:9004"]
+    environment:
+      - MCP_PORT=9004
+      - CONFIG_PATH=/app/config.yml
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - EMBED_MODEL=text-embedding-3-small
+      - CHROMA_PATH=/app/chroma_data
+      - COLLECTION_NAME=banking_errors
+      - JIRA_STORE_PATH=/app/jira_store.json
+    volumes:
+      - ./tenants/${TENANT:-iitr-banking}/config.yml:/app/config.yml:ro
+      - chroma-data:/app/chroma_data
+    mem_limit: 512m
+
+  alert-resolution-mcp:
+    <<: *mcp-base
+    build:
+      context: .
+      dockerfile: mcp-servers/alert-resolution-mcp/Dockerfile
+    container_name: alert-resolution-mcp
+    ports: ["9005:9005"]
+    environment:
+      - MCP_PORT=9005
+      - CONFIG_PATH=/app/config.yml
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - CHROMA_PATH=/app/alert_cache
+      - COLLECTION_NAME=alert_resolutions
+      - TTL_DAYS=60
+      - CLEANUP_INTERVAL_HOURS=24
+      - EMBED_MODEL=text-embedding-3-small
+    volumes:
+      - ./tenants/${TENANT:-iitr-banking}/config.yml:/app/config.yml:ro
+      - alert-cache:/app/alert_cache
+    mem_limit: 128m
+
+  # ── Dashboard ───────────────────────────────────────────────────────────────
+  dashboard-api:
+    build:
+      context: .
+      dockerfile: dashboard/api/Dockerfile
+    container_name: dashboard-api
+    ports: ["8080:8080"]
+    networks: [banking-net]
+    mem_limit: 96m
+    restart: unless-stopped
+
+  # ── AI Agents (LangGraph pipeline) ─────────────────────────────────────────
+  agents:
+    <<: *mcp-base
+    build:
+      context: .
+      dockerfile: agents/Dockerfile
+    container_name: agents
+    environment:
+      - CONFIG_PATH=/app/config.yml
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - JIRA_EMAIL=${JIRA_EMAIL:-}
+      - JIRA_API_TOKEN=${JIRA_API_TOKEN:-}
+      - GRAFANA_MCP_URL=http://alert-mcp:9001
+      - KIBANA_MCP_URL=http://logs-mcp:9002
+      - JIRA_MCP_URL=http://issues-mcp:9003
+      - VECTORDB_MCP_URL=http://vectordb-mcp:9004
+      - ALERT_RESOLUTION_MCP_URL=http://alert-resolution-mcp:9005
+      - DASHBOARD_API_URL=http://dashboard-api:8080
+      - POLL_INTERVAL_SECONDS=30
+      - LLM_ENABLED=true
+    depends_on:
+      - alert-mcp
+      - logs-mcp
+      - issues-mcp
+      - vectordb-mcp
+      - alert-resolution-mcp
+      - dashboard-api
+    mem_limit: 256m
+
+networks:
+  banking-net:
+    driver: bridge
+
+volumes:
+  chroma-data:
+  alert-cache:
+  prometheus-data:
+  grafana-data:
+  lokidata:
