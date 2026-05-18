@@ -163,14 +163,15 @@ services:
   # MCP SERVERS
   # ─────────────────────────────────────────────
 
-  grafana-mcp:
+  alert-mcp:
     build:
-      context: ./mcp-servers/grafana-mcp
-      dockerfile: Dockerfile
-    container_name: grafana-mcp
+      context: .
+      dockerfile: mcp-servers/alert-mcp/Dockerfile
+    container_name: alert-mcp
     ports:
       - "9001:9001"
     environment:
+      - CONFIG_PATH=/app/config.yml
       - ALERTMANAGER_URL=http://alertmanager:9093
       - PROMETHEUS_URL=http://prometheus:9090
       - MCP_PORT=9001
@@ -284,7 +285,7 @@ services:
       dockerfile: Dockerfile
     container_name: agents
     environment:
-      - GRAFANA_MCP_URL=http://grafana-mcp:9001
+      - GRAFANA_MCP_URL=http://alert-mcp:9001
       - KIBANA_MCP_URL=http://kibana-mcp:9002
       - JIRA_MCP_URL=http://jira-mcp:9003
       - VECTORDB_MCP_URL=http://vectordb-mcp:9004
@@ -299,7 +300,7 @@ services:
       - banking-net
     mem_limit: 256m
     depends_on:
-      - grafana-mcp
+      - alert-mcp
       - kibana-mcp
       - jira-mcp
       - vectordb-mcp

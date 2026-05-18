@@ -14,7 +14,7 @@ import httpx
 logger = logging.getLogger("mcp_client")
 
 # ── MCP server base URLs (from environment, defaults use Docker network names)
-GRAFANA_MCP_URL  = os.getenv("GRAFANA_MCP_URL",  "http://grafana-mcp:9001")
+GRAFANA_MCP_URL  = os.getenv("GRAFANA_MCP_URL",  "http://alert-mcp:9001")
 KIBANA_MCP_URL   = os.getenv("KIBANA_MCP_URL",   "http://kibana-mcp:9002")
 JIRA_MCP_URL     = os.getenv("JIRA_MCP_URL",     "http://jira-mcp:9003")
 VECTORDB_MCP_URL = os.getenv("VECTORDB_MCP_URL", "http://vectordb-mcp:9004")
