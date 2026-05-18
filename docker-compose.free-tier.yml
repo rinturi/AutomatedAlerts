@@ -188,14 +188,17 @@ services:
       timeout: 5s
       retries: 3
 
-  kibana-mcp:
+  logs-mcp:
     build:
-      context: ./mcp-servers/kibana-mcp
+      context: .
+      dockerfile: mcp-servers/logs-mcp/Dockerfile
+    # context: ./mcp-servers/kibana-mcp  # original
       dockerfile: Dockerfile
-    container_name: kibana-mcp
+    container_name: logs-mcp
     ports:
       - "9002:9002"
     environment:
+      - CONFIG_PATH=/app/config.yml
       - MCP_PORT=9002
       - LOG_MODE=loki
       - LOKI_URL=http://loki:3100
@@ -209,14 +212,17 @@ services:
       timeout: 5s
       retries: 3
 
-  jira-mcp:
+  issues-mcp:
     build:
-      context: ./mcp-servers/jira-mcp
+      context: .
+      dockerfile: mcp-servers/issues-mcp/Dockerfile
+    # context: ./mcp-servers/jira-mcp  # original
       dockerfile: Dockerfile
-    container_name: jira-mcp
+    container_name: issues-mcp
     ports:
       - "9003:9003"
     environment:
+      - CONFIG_PATH=/app/config.yml
       - MCP_PORT=9003
       - JIRA_URL=https://iitr-jiraboard.atlassian.net
       - JIRA_EMAIL=irrnitw@gmail.com
@@ -286,8 +292,8 @@ services:
     container_name: agents
     environment:
       - GRAFANA_MCP_URL=http://alert-mcp:9001
-      - KIBANA_MCP_URL=http://kibana-mcp:9002
-      - JIRA_MCP_URL=http://jira-mcp:9003
+      - KIBANA_MCP_URL=http://logs-mcp:9002
+      - JIRA_MCP_URL=http://issues-mcp:9003
       - VECTORDB_MCP_URL=http://vectordb-mcp:9004
       - ALERT_RESOLUTION_MCP_URL=http://alert-resolution-mcp:9005
       - DASHBOARD_API_URL=http://dashboard-api:8080
@@ -301,8 +307,8 @@ services:
     mem_limit: 256m
     depends_on:
       - alert-mcp
-      - kibana-mcp
-      - jira-mcp
+      - logs-mcp
+      - issues-mcp
       - vectordb-mcp
       - dashboard-api
     restart: unless-stopped
