@@ -248,9 +248,11 @@
            </div>` : '';
 
       const resCell = inc.resolution_found
-        ? `<div class="resolution-found">✓ ${(inc.llm_key_action || inc.error_exception || '').substring(0, 80)}</div>
-           ${inc.jira_issue_id
-             ? `<div style="font-size:11px;color:#64748b;margin-top:4px">→ See JIRA ${inc.jira_issue_id} for full steps</div>` : ''}
+        ? `<div class="resolution-found">✓ ${(inc.resolution || '').substring(0, 80)}...</div>
+           ${inc.resolution_steps && inc.resolution_steps.length
+             ? `<ul class="steps">${inc.resolution_steps.slice(0,2).map(s =>
+               `<li>${s.substring(0,70)}</li>`).join('')}${inc.resolution_steps.length > 2
+               ? `<li>+${inc.resolution_steps.length - 2} more steps</li>` : ''}</ul>` : ''}
            ${llmPanel}`
         : `<div class="resolution-none">No similar error recorded</div>${llmPanel}`;
 
@@ -260,7 +262,7 @@
              <button class="btn btn-view" onclick="showDetail('${inc.incident_id}')">View steps</button>
            </div>`
         : `<div class="actions">
-             <button class="btn btn-create" onclick="showDetail('${inc.incident_id}')">Create JIRA ↗</button>
+             <button class="btn btn-create" onclick="createJiraTicket('${inc.incident_id}','${inc.alert_name}','${inc.service}','${inc.error_exception || \'\'}','${inc.alert_timestamp || \'\'}')">Create JIRA ↗</button>
              <button class="btn btn-view" onclick="showDetail('${inc.incident_id}')">View detail</button>
            </div>`;
 
@@ -334,8 +336,8 @@
       ${inc.resolution_found ? `
       <div class="detail-section">
         <div class="detail-label">JIRA resolution — ${inc.jira_issue_id}</div>
-        <div class="detail-value" style="margin-bottom:8px;color:#86efac">${inc.llm_key_action || inc.error_exception || ''}</div>
-        ${inc.llm_risk_note ? `<div style="color:#fbbf24;font-size:12px;margin-bottom:8px">⚠ ${inc.llm_risk_note}</div>` : ''}
+        <div class="detail-value" style="margin-bottom:8px">${inc.jira_summary || ''}</div>
+        <div class="detail-code" style="margin-bottom:12px">${inc.resolution || ''}</div>
         ${steps ? `<div class="detail-label">Resolution steps</div>
           <ol class="step-list">${steps}</ol>` : ''}
       </div>` : `
@@ -360,6 +362,64 @@
 
   function closeModal(e) {
     if (e.target.id === 'modal') document.getElementById('modal').style.display = 'none';
+  }
+
+  async function createJiraTicket(incidentId, alertName, service, exceptionType, alertTimestamp) {
+    const summary     = '[L1] ' + (exceptionType || alertName) + ' in ' + service;
+    const description = 'Alert: ' + alertName + '\nService: ' + service +
+                        '\nException: ' + exceptionType +
+                        '\nTimestamp: ' + alertTimestamp +
+                        '\n\nCreated by L1 engineer from dashboard. Please investigate and add resolution steps.';
+    const btn = event.target;
+    btn.textContent = 'Creating...';
+    btn.disabled    = true;
+    try {
+      const resp = await fetch('/api/create-jira-ticket', {
+        method:  'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          summary:         summary,
+          description:     description,
+          service:         service,
+          priority:        'High',
+          exception_type:  exceptionType,
+          alert_name:      alertName,
+          alert_timestamp: alertTimestamp,
+        })
+      });
+      const data = await resp.json();
+      if (data.status === 'created') {
+        btn.textContent = data.issue_id + ' ↗';
+        btn.style.background = '#059669';
+        btn.onclick = function() { window.open(data.url, '_blank'); };
+        showToast('Jira ticket ' + data.issue_id + ' created successfully');
+      } else {
+        btn.textContent = 'Failed';
+        btn.style.background = '#dc2626';
+        showToast('Failed: ' + data.message, 'error');
+        setTimeout(function() {
+          btn.textContent = 'Create JIRA ↗';
+          btn.style.background = '';
+          btn.disabled = false;
+        }, 3000);
+      }
+    } catch(e) {
+      btn.textContent = 'Error';
+      btn.disabled = false;
+      showToast('Network error creating ticket', 'error');
+    }
+  }
+
+  function showToast(message, type) {
+    type = type || 'success';
+    var toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:9999;' +
+      'background:' + (type === 'error' ? '#dc2626' : '#059669') + ';' +
+      'color:white;padding:12px 20px;border-radius:8px;' +
+      'font-size:13px;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(function() { toast.remove(); }, 4000);
   }
 
   async function pollFiringAlerts() {

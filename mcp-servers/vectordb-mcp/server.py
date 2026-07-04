@@ -120,6 +120,81 @@ def build_document_text(issue: dict) -> str:
     return " ".join(p for p in parts if p).strip()
 
 
+INDEXABLE_STATUSES = {"Done", "Resolved", "Closed"}
+
+def load_jira_from_cloud() -> list:
+    """
+    Fetch only RESOLVED/DONE issues from Jira Cloud.
+    Falls back to jira_store.json if Jira Cloud unreachable.
+    """
+    import base64, urllib.request, urllib.parse
+
+    jira_url   = os.getenv("JIRA_URL", "")
+    jira_email = os.getenv("JIRA_EMAIL", "")
+    jira_token = os.getenv("JIRA_API_TOKEN", "")
+    board_id   = os.getenv("JIRA_BOARD_ID", "2")
+
+    if jira_url and jira_email and jira_token:
+        try:
+            creds   = base64.b64encode(f"{jira_email}:{jira_token}".encode()).decode()
+            headers = {"Authorization": f"Basic {creds}", "Accept": "application/json"}
+            all_issues = []
+            start_at   = 0
+            while True:
+                params = urllib.parse.urlencode({
+                    "maxResults": 50, "startAt": start_at,
+                    "fields": "summary,labels,status,priority,description",
+                })
+                req = urllib.request.Request(
+                    f"{jira_url}/rest/agile/1.0/board/{board_id}/issue?{params}",
+                    headers=headers
+                )
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read())
+                batch = data.get("issues", [])
+                all_issues.extend(batch)
+                if len(batch) < 50:
+                    break
+                start_at += 50
+
+            parsed = []
+            for raw in all_issues:
+                fields  = raw.get("fields", {})
+                status  = fields.get("status", {}).get("name", "")
+                if status not in INDEXABLE_STATUSES:
+                    continue
+                labels         = fields.get("labels", [])
+                exception_type = next((l for l in labels if "Exception" in l or "Error" in l), "")
+                service        = next((l for l in labels if l.endswith("-svc")), "")
+                desc_obj       = fields.get("description") or {}
+                desc_text      = ""
+                if isinstance(desc_obj, dict):
+                    for block in desc_obj.get("content", []):
+                        for item in block.get("content", []):
+                            if item.get("type") == "text":
+                                desc_text += item.get("text", "")
+                parsed.append({
+                    "id":               raw.get("key"),
+                    "summary":          fields.get("summary", ""),
+                    "description":      desc_text,
+                    "status":           status,
+                    "priority":         fields.get("priority", {}).get("name", "Medium"),
+                    "labels":           labels,
+                    "service":          service,
+                    "exception_type":   exception_type,
+                    "resolution":       desc_text,
+                    "resolution_steps": [s.strip() for s in desc_text.split(".")
+                                        if len(s.strip()) > 20][:5],
+                    "error_keywords":   labels,
+                })
+            print(f"[vectordb-mcp] Fetched {len(parsed)} Done/Resolved issues from Jira Cloud")
+            return parsed
+        except Exception as e:
+            print(f"[vectordb-mcp] Jira Cloud fetch failed: {e} — falling back to jira_store.json")
+
+    return load_jira_store()
+
+
 def load_jira_store() -> list:
     if not JIRA_STORE_PATH.exists():
         return []
@@ -129,12 +204,13 @@ def load_jira_store() -> list:
 
 # ── Auto-index on startup ─────────────────────────────────────────────────────
 
+# Only index issues with these statuses — open/in-progress have no proven resolution
 def seed_collection_from_jira():
     """
     On startup, index all JIRA defects that are not yet in ChromaDB.
     Idempotent — skips documents already indexed by ID.
     """
-    issues = load_jira_store()
+    issues = load_jira_from_cloud()
     if not issues:
         print("[vectordb-mcp] No JIRA store found — skipping seed")
         return
@@ -151,6 +227,11 @@ def seed_collection_from_jira():
     for issue in issues:
         doc_id = issue["id"]
         if doc_id in existing_ids:
+            continue
+        # Skip issues not in INDEXABLE_STATUSES
+        issue_status = issue.get("status", "")
+        if issue_status not in INDEXABLE_STATUSES:
+            print(f"[vectordb-mcp] Skipping {doc_id} (status={issue_status})")
             continue
         doc_text = build_document_text(issue)
         metadata = {
@@ -186,6 +267,102 @@ try:
 except Exception as e:
     print(f"[vectordb-mcp] Seed warning: {e}")
 
+
+# ── Jira polling thread — auto-index newly resolved tickets ──────────────────
+def _poll_jira_for_new_resolved():
+    """Poll Jira every 10 minutes for Done issues not yet in ChromaDB."""
+    import time, base64
+    import urllib.request as _ur
+    import urllib.parse as _up
+
+    print("[vectordb-mcp] Jira polling thread started (interval: 10 minutes)")
+    while True:
+        time.sleep(600)
+        try:
+            jira_url   = os.getenv("JIRA_URL", "")
+            jira_email = os.getenv("JIRA_EMAIL", "")
+            jira_token = os.getenv("JIRA_API_TOKEN", "")
+            board_id   = os.getenv("JIRA_BOARD_ID", "2")
+            if not (jira_url and jira_email and jira_token):
+                continue
+            creds   = base64.b64encode(f"{jira_email}:{jira_token}".encode()).decode()
+            headers = {"Authorization": f"Basic {creds}", "Accept": "application/json"}
+            all_issues = []
+            start_at   = 0
+            while True:
+                params = _up.urlencode({
+                    "maxResults": 50, "startAt": start_at,
+                    "fields": "summary,labels,status,priority,description"
+                })
+                req = _ur.Request(
+                    f"{jira_url}/rest/agile/1.0/board/{board_id}/issue?{params}",
+                    headers=headers
+                )
+                with _ur.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read())
+                batch = data.get("issues", [])
+                all_issues.extend(batch)
+                if len(batch) < 50:
+                    break
+                start_at += 50
+            existing     = _collection.get(include=[])
+            existing_ids = set(existing.get("ids", []))
+            new_count    = 0
+            for raw in all_issues:
+                key    = raw.get("key")
+                fields = raw.get("fields", {})
+                status = fields.get("status", {}).get("name", "")
+                if status not in INDEXABLE_STATUSES:
+                    continue
+                if key in existing_ids:
+                    continue
+                labels         = fields.get("labels", [])
+                exception_type = next((l for l in labels if "Exception" in l or "Error" in l), "")
+                service        = next((l for l in labels if l.endswith("-svc")), "")
+                desc_obj       = fields.get("description") or {}
+                desc_text      = ""
+                if isinstance(desc_obj, dict):
+                    for block in desc_obj.get("content", []):
+                        for item in block.get("content", []):
+                            if item.get("type") == "text":
+                                desc_text += item.get("text", "")
+                issue = {
+                    "id": key, "summary": fields.get("summary",""),
+                    "description": desc_text, "status": status,
+                    "priority": fields.get("priority",{}).get("name","Medium"),
+                    "labels": labels, "service": service,
+                    "exception_type": exception_type, "resolution": desc_text,
+                    "error_keywords": labels,
+                    "resolution_steps": [s.strip() for s in desc_text.split(".")
+                                        if len(s.strip()) > 20][:5],
+                }
+                doc_text = build_document_text(issue)
+                metadata = {
+                    "issue_id": key, "summary": fields.get("summary","")[:500],
+                    "exception_type": exception_type, "service": service,
+                    "status": status,
+                    "priority": fields.get("priority",{}).get("name","Medium"),
+                    "resolution_short": desc_text[:300],
+                }
+                try:
+                    embeddings = _openai_embed([doc_text])
+                    _collection.add(
+                        ids=[key], embeddings=embeddings,
+                        documents=[doc_text], metadatas=[metadata]
+                    )
+                    print(f"[vectordb-mcp] Poll: indexed {key} service={service}")
+                    new_count += 1
+                except Exception as idx_err:
+                    print(f"[vectordb-mcp] Poll: failed {key}: {idx_err}")
+            print(f"[vectordb-mcp] Poll complete: {new_count} new issues indexed")
+        except Exception as poll_err:
+            print(f"[vectordb-mcp] Poll error: {poll_err}")
+
+import threading as _threading
+_jira_poll_thread = _threading.Thread(
+    target=_poll_jira_for_new_resolved, daemon=True, name="jira-poll"
+)
+_jira_poll_thread.start()
 
 # ── Request models ────────────────────────────────────────────────────────────
 
@@ -555,6 +732,145 @@ async def list_tools():
             }
         ]
     }
+
+
+# ── Jira Webhook — auto-index newly resolved tickets ──────────────────────────
+@app.post("/webhook/jira")
+async def jira_webhook(payload: dict):
+    """
+    Called by Jira Cloud when any issue transitions to Done/Resolved/Closed.
+    Fetches the issue, checks if already indexed, embeds and indexes if new.
+
+    Configure in Jira: Project Settings → Automation → Webhook
+    URL: http://EC2_IP:9004/webhook/jira
+    Trigger: Issue transitioned → Status = Done
+    """
+    import base64, urllib.request as _ureq, urllib.parse as _uparse
+
+    # Extract issue key from Jira webhook payload
+    issue_key = (
+        payload.get("issue", {}).get("key")
+        or payload.get("issueKey")
+        or payload.get("key")
+    )
+
+    if not issue_key:
+        print(f"[webhook/jira] No issue key in payload: {list(payload.keys())}")
+        return {"status": "ignored", "reason": "no issue key in payload"}
+
+    # Check transition status
+    transition = payload.get("transition", {})
+    new_status  = (
+        transition.get("to", {}).get("name", "")
+        or payload.get("issue", {}).get("fields", {})
+                  .get("status", {}).get("name", "")
+    )
+
+    print(f"[webhook/jira] Received: {issue_key}  status={new_status}")
+
+    if new_status not in INDEXABLE_STATUSES:
+        print(f"[webhook/jira] Skipping {issue_key} — status '{new_status}' not indexable")
+        return {"status": "ignored", "reason": f"status '{new_status}' not in INDEXABLE_STATUSES"}
+
+    # Check if already indexed
+    try:
+        existing = _collection.get(ids=[issue_key], include=[])
+        if existing.get("ids"):
+            print(f"[webhook/jira] {issue_key} already indexed — skipping")
+            return {"status": "already_indexed", "issue_id": issue_key}
+    except Exception:
+        pass
+
+    # Fetch full issue from Jira Cloud
+    jira_url   = os.getenv("JIRA_URL", "")
+    jira_email = os.getenv("JIRA_EMAIL", "")
+    jira_token = os.getenv("JIRA_API_TOKEN", "")
+
+    if not (jira_url and jira_email and jira_token):
+        return {"status": "error", "reason": "Jira env vars not set"}
+
+    try:
+        creds   = base64.b64encode(f"{jira_email}:{jira_token}".encode()).decode()
+        headers = {"Authorization": f"Basic {creds}", "Accept": "application/json"}
+        params  = _uparse.urlencode({"fields": "summary,labels,status,description,priority"})
+        req     = _ureq.Request(
+            f"{jira_url}/rest/api/3/issue/{issue_key}?{params}",
+            headers=headers
+        )
+        with _ureq.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except Exception as e:
+        print(f"[webhook/jira] Failed to fetch {issue_key} from Jira: {e}")
+        return {"status": "error", "reason": str(e)}
+
+    fields         = data.get("fields", {})
+    status_name    = fields.get("status", {}).get("name", "")
+    labels         = fields.get("labels", [])
+    exception_type = next((l for l in labels if "Exception" in l or "Error" in l), "")
+    service        = next((l for l in labels if l.endswith("-svc")), "")
+    summary        = fields.get("summary", "")
+    priority       = fields.get("priority", {}).get("name", "Medium")
+
+    # Parse ADF description
+    desc_obj  = fields.get("description") or {}
+    desc_text = ""
+    if isinstance(desc_obj, dict):
+        for block in desc_obj.get("content", []):
+            for item in block.get("content", []):
+                if item.get("type") == "text":
+                    desc_text += item.get("text", "")
+
+    # Final status check from Jira
+    if status_name not in INDEXABLE_STATUSES:
+        print(f"[webhook/jira] {issue_key} Jira status='{status_name}' — not indexable")
+        return {"status": "ignored", "reason": f"Jira status '{status_name}' not indexable"}
+
+    # Build issue dict and index
+    issue = {
+        "id":               issue_key,
+        "summary":          summary,
+        "description":      desc_text,
+        "status":           status_name,
+        "priority":         priority,
+        "labels":           labels,
+        "service":          service,
+        "exception_type":   exception_type,
+        "resolution":       desc_text,
+        "resolution_steps": [s.strip() for s in desc_text.split(".")
+                             if len(s.strip()) > 20][:5],
+        "error_keywords":   labels,
+    }
+
+    doc_text = build_document_text(issue)
+    metadata = {
+        "issue_id":         issue_key,
+        "summary":          summary[:500],
+        "exception_type":   exception_type,
+        "service":          service,
+        "status":           status_name,
+        "priority":         priority,
+        "resolution_short": desc_text[:300],
+    }
+
+    try:
+        embeddings = _openai_embed([doc_text])
+        _collection.add(
+            ids=[issue_key],
+            embeddings=embeddings,
+            documents=[doc_text],
+            metadatas=[metadata]
+        )
+        print(f"[webhook/jira] Indexed {issue_key} — service={service} exception={exception_type}")
+        return {
+            "status":    "indexed",
+            "issue_id":  issue_key,
+            "service":   service,
+            "exception": exception_type,
+            "summary":   summary,
+        }
+    except Exception as e:
+        print(f"[webhook/jira] Failed to index {issue_key}: {e}")
+        return {"status": "error", "reason": str(e)}
 
 
 # ── Entry point ────────────────────────────────────────────────────────────────

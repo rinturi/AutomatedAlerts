@@ -10,9 +10,12 @@ Endpoints:
   GET  /health             → health check
 """
 
+import os
 import uuid
 from collections import deque
 from datetime import datetime, timezone
+
+import httpx
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
@@ -100,6 +103,40 @@ def health():
         "total_incidents": len(_incidents),
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
+
+
+@app.post("/create-jira-ticket")
+async def create_jira_ticket(body: dict):
+    """
+    Called by L1 dashboard when engineer clicks Create JIRA button.
+    Forwards to jira-mcp to create a real Jira ticket.
+    Returns the new ticket ID and URL.
+    """
+    jira_mcp_url = os.getenv("JIRA_MCP_URL", "http://jira-mcp:9003")
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"{jira_mcp_url}/tools/create_issue",
+                json={
+                    "summary":         body.get("summary", ""),
+                    "description":     body.get("description", ""),
+                    "service":         body.get("service", ""),
+                    "priority":        body.get("priority", "High"),
+                    "exception_type":  body.get("exception_type", ""),
+                    "alert_name":      body.get("alert_name", ""),
+                    "alert_timestamp": body.get("alert_timestamp", ""),
+                }
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return {
+                "status":   "created",
+                "issue_id": data.get("issue_id"),
+                "url":      data.get("url"),
+                "source":   data.get("source"),
+            }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 @app.post("/incidents", status_code=201)

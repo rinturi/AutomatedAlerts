@@ -163,15 +163,14 @@ services:
   # MCP SERVERS
   # ─────────────────────────────────────────────
 
-  alert-mcp:
+  grafana-mcp:
     build:
-      context: .
-      dockerfile: mcp-servers/alert-mcp/Dockerfile
-    container_name: alert-mcp
+      context: ./mcp-servers/grafana-mcp
+      dockerfile: Dockerfile
+    container_name: grafana-mcp
     ports:
       - "9001:9001"
     environment:
-      - CONFIG_PATH=/app/config.yml
       - ALERTMANAGER_URL=http://alertmanager:9093
       - PROMETHEUS_URL=http://prometheus:9090
       - MCP_PORT=9001
@@ -188,17 +187,14 @@ services:
       timeout: 5s
       retries: 3
 
-  logs-mcp:
+  kibana-mcp:
     build:
-      context: .
-      dockerfile: mcp-servers/logs-mcp/Dockerfile
-    # context: ./mcp-servers/kibana-mcp  # original
+      context: ./mcp-servers/kibana-mcp
       dockerfile: Dockerfile
-    container_name: logs-mcp
+    container_name: kibana-mcp
     ports:
       - "9002:9002"
     environment:
-      - CONFIG_PATH=/app/config.yml
       - MCP_PORT=9002
       - LOG_MODE=loki
       - LOKI_URL=http://loki:3100
@@ -212,21 +208,18 @@ services:
       timeout: 5s
       retries: 3
 
-  issues-mcp:
+  jira-mcp:
     build:
-      context: .
-      dockerfile: mcp-servers/issues-mcp/Dockerfile
-    # context: ./mcp-servers/jira-mcp  # original
+      context: ./mcp-servers/jira-mcp
       dockerfile: Dockerfile
-    container_name: issues-mcp
+    container_name: jira-mcp
     ports:
       - "9003:9003"
     environment:
-      - CONFIG_PATH=/app/config.yml
       - MCP_PORT=9003
       - JIRA_URL=https://iitr-jiraboard.atlassian.net
-      - JIRA_EMAIL=irrnitw@gmail.com
-      - JIRA_API_TOKEN=ATATT3xFfGF0QNLl0B8EztoahWFa0FNkwsylMJ2D_E_VWUwwPUl978Vn744MDTPFVZtJHND4ygCQvDhzcb7DgW6a_-Unv-zfZxHC_jSIeAAu5FekdotrV1ELB_L6U5GD5bmkfkpyvEOluAkOYtc0dSoU0nF8Q-M5uwf1pGJPF0n4qFIkDawJnLo=FB4D8D6D
+      - JIRA_EMAIL=${JIRA_EMAIL}
+      - JIRA_API_TOKEN=${JIRA_API_TOKEN}
       - JIRA_PROJECT=KAN
       - JIRA_STORE_PATH=/app/jira_store.json
       - SIMILARITY_THRESHOLD=0.25
@@ -256,6 +249,10 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - HIGH_THRESHOLD=0.75
       - MEDIUM_THRESHOLD=0.50
+      - JIRA_URL=https://iitr-jiraboard.atlassian.net
+      - JIRA_EMAIL=${JIRA_EMAIL}
+      - JIRA_API_TOKEN=${JIRA_API_TOKEN}
+      - JIRA_BOARD_ID=2
     volumes:
       - chroma-data:/app/chroma_data
     networks:
@@ -291,9 +288,9 @@ services:
       dockerfile: Dockerfile
     container_name: agents
     environment:
-      - GRAFANA_MCP_URL=http://alert-mcp:9001
-      - KIBANA_MCP_URL=http://logs-mcp:9002
-      - JIRA_MCP_URL=http://issues-mcp:9003
+      - GRAFANA_MCP_URL=http://grafana-mcp:9001
+      - KIBANA_MCP_URL=http://kibana-mcp:9002
+      - JIRA_MCP_URL=http://jira-mcp:9003
       - VECTORDB_MCP_URL=http://vectordb-mcp:9004
       - ALERT_RESOLUTION_MCP_URL=http://alert-resolution-mcp:9005
       - DASHBOARD_API_URL=http://dashboard-api:8080
@@ -306,9 +303,9 @@ services:
       - banking-net
     mem_limit: 256m
     depends_on:
-      - alert-mcp
-      - logs-mcp
-      - issues-mcp
+      - grafana-mcp
+      - kibana-mcp
+      - jira-mcp
       - vectordb-mcp
       - dashboard-api
     restart: unless-stopped

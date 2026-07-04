@@ -13,7 +13,7 @@ Decision flow:
     → medium (0.50-0.75)→ jira-mcp get_issue + search_issues   → verify resolution
     → low / none       → jira-mcp search_issues (keyword)
                            → match found  → get_issue           → resolution found
-                           → no match     → create_issue         → new incident
+                           → no match     → resolution_found=False → L1 creates ticket from dashboard
 """
 
 import logging
@@ -224,72 +224,19 @@ def run(state: IncidentState) -> IncidentState:
                 logger.info("Agent 2 complete — resolution found via keyword search")
                 return state
 
-    # ── Step 5: No match anywhere — create new JIRA incident ──────────────────
+    # ── Step 5: No match — L1 engineer creates ticket from dashboard ──────────
     logger.info(
-        "Agent 2: No matching resolution found — creating new JIRA incident"
+        "Agent 2: No matching resolution found. "
+        "L1 engineer can create a Jira ticket from the dashboard."
     )
-
-    # Use LLM to generate a better incident description if available
-    auto_description = llm.generate_new_incident_description(
-        service         = service,
-        alert_name      = state.get("alert_name", ""),
-        alert_timestamp = state.get("alert_timestamp", ""),
-        error_message   = error_message,
-        error_exception = error_exception,
-    ) or (
-        f"Alert: {state.get('alert_name')}\n"
-        f"Service: {service}\n"
-        f"Alert timestamp: {state.get('alert_timestamp')}\n"
-        f"Error message: {error_message}\n"
-        f"Exception type: {error_exception}\n"
-        f"Recurrence count: {state.get('error_recurrence', 0)}\n\n"
-        f"This incident was automatically created by the Agentic AI L1 system "
-        f"because no matching resolution was found in the knowledge base."
+    state["resolution_found"] = False
+    state["jira_issue_id"]    = None
+    state["resolution"]       = None
+    state["resolution_steps"] = []
+    state["remark"] = (
+        f"No resolution found for "
+        f"{state.get('error_exception') or 'this error'} in {service}. "
+        "Use the dashboard to create a Jira ticket and investigate."
     )
-
-    create_response = mcp.create_jira_issue(
-        summary     = f"[AUTO] {error_exception or 'Unknown error'} in {service}",
-        description = auto_description,
-        service         = service,
-        priority        = "High" if state.get("alert_severity") == "critical" else "Medium",
-        error_message   = error_message,
-        exception_type  = error_exception,
-        alert_name      = state.get("alert_name", ""),
-        alert_timestamp = state.get("alert_timestamp", ""),
-    )
-
-    if create_response:
-        new_issue = create_response.get("issue", {})
-        new_id    = create_response.get("issue_id") or new_issue.get("id")
-
-        state["jira_issue_id"]    = new_id
-        state["jira_summary"]     = new_issue.get("summary")
-        state["jira_status"]      = "Open"
-        state["resolution"]       = None
-        state["resolution_steps"] = []
-        state["resolution_found"] = False
-        state["remark"]           = "No similar error recorded — new incident created"
-
-        logger.info(f"Agent 2: New incident created — {new_id}")
-
-        # Index the new issue in vectordb-mcp for future semantic searches
-        index_text = f"{error_exception} {error_message} {service}"
-        mcp.index_document(
-            doc_id         = new_id,
-            text           = index_text,
-            issue_id       = new_id,
-            summary        = new_issue.get("summary", ""),
-            exception_type = error_exception,
-            service        = service,
-            status         = "Open",
-        )
-        logger.info(f"Agent 2: New issue {new_id} indexed in vectordb-mcp")
-
-    else:
-        logger.error("Agent 2: Failed to create JIRA issue")
-        state["resolution_found"] = False
-        state["remark"]           = "No similar error recorded — incident creation failed"
-        state["pipeline_error"]   = "jira_create_issue_failed"
-
-    logger.info("Agent 2 complete — handing off to Agent 3 (Dashboard Writer)")
+    logger.info("Agent 2 complete — no resolution found, dashboard action required")
     return state
